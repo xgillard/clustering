@@ -1,0 +1,12 @@
+[package]
+name        = "clustering"
+version     = "0.1.0"
+edition     = "2021"
+description = "easy way to perform kmeans clustering on arbitrary data"
+license     = "MIT"
+repository  = "https://github.com/xgillard/clustering"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+rand = "0.8"
