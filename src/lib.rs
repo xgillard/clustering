@@ -135,6 +135,70 @@ pub fn kmeans<'a, T: Elem>(k: usize, elems: &[T], iter: usize) -> Clustering<T> 
     }
 }
 
+
+/// This function returns a clustering that groups the given set of 
+/// 'elems' in 'k' clusters and will at most perform 'iter' iterations before stopping
+/// 
+/// This implementation is sequential
+pub fn seq_kmeans<'a, T: Elem>(k: usize, elems: &[T], iter: usize) -> Clustering<T> {
+    let mut centroids = initialize(k, elems);
+    let mut membership = vec![0; elems.len()];
+    let mut counts = vec![0; k];
+
+    for _ in 0..iter {
+        let mut changes = 0;
+
+        // assign each vertex to the cluster whose centroid is the closest
+        for (i, e) in elems.iter().enumerate() {
+            let old = membership[i];
+            let mut clus = old;
+            let mut dist = square_distance(e, &centroids[old]);
+
+            for (c, centroid) in centroids.iter().enumerate() {
+                let sdist = square_distance(e, centroid);
+                if sdist < dist {
+                    dist = sdist;
+                    clus = c;
+                    changes += 1;
+                }
+            }
+
+            membership[i] = clus;
+        }
+
+        // recompute the n-dimensions of each centroid
+        // -> start resetting all centroid data
+        counts.iter_mut().for_each(|x| *x = 0);
+        centroids.iter_mut().for_each(|c| 
+            c.0.iter_mut().for_each(|d| *d = 0.0));
+        
+        for (i, elem) in elems.iter().enumerate() {
+            let clus = membership[i];
+            counts[clus] += 1;
+            
+            for (d, dim) in centroids[clus].0.iter_mut().enumerate() {
+                *dim += elem.at(d);
+            }
+        }
+        
+        // -> normalize the computed distances
+        for (centroid, size) in centroids.iter_mut().zip(counts.iter().copied()) {
+            centroid.0.iter_mut().for_each(|d| if size == 0 { *d = 0.0 } else {*d /= size as f64});
+        }
+                
+        // short circuit
+        if changes == 0 {
+            break;
+        }
+    }
+
+    Clustering { 
+        elements: elems, 
+        membership, 
+        centroids
+    }
+}
+
 //- /// Returns the generalized euclidean distance between elements a and b
 //- fn distance(a: &dyn Elem, b: &dyn Elem) -> f64 {
 //-    square_distance(a, b).sqrt()
