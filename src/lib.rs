@@ -30,6 +30,7 @@
 //! 
 //! # Example
 //! ```
+//! 
 //! use clustering::*;
 //! 
 //! let n_samples    = 20_000; // # of samples in the example
@@ -49,6 +50,29 @@
 //! println!("membership: {:?}", clustering.membership);
 //! println!("centroids : {:?}", clustering.centroids);
 //! ```
+
+use std::cmp::Ordering;
+use std::sync::atomic::{AtomicUsize,AtomicU64};
+use rayon::prelude::*;
+use lazy_static::lazy_static;
+
+//==========================================================================
+
+lazy_static! {
+    static ref LOG: u64 = {
+        let res = init_log();
+        res
+    };
+}
+
+// install a logger facility
+fn init_log() -> u64 {
+    let _res = env_logger::try_init();
+    println!("\n ************** initializing logger *****************\n");    
+    return 1;
+}
+
+//=============================================================================
 
 /// This is the trait you will want to implement for the types you wish to cluster.
 pub trait Elem {
@@ -76,31 +100,37 @@ pub struct Clustering<'a, T> {
 
 /// This function returns a clustering that groups the given set of 
 /// 'elems' in 'k' clusters and will at most perform 'iter' iterations before stopping
-pub fn kmeans<'a, T: Elem>(k: usize, elems: &[T], iter: usize) -> Clustering<T> {
+pub fn kmeans<'a, T: Elem + Sync>(k: usize, elems: &[T], iter: usize) -> Clustering<T> {
     let mut centroids = initialize(k, elems);
-    let mut membership = vec![0; elems.len()];
+    let membership : Vec<AtomicUsize> = (0..elems.len()).into_iter().map(|_| AtomicUsize::new(0usize)).collect();
     let mut counts = vec![0; k];
 
-    for _ in 0..iter {
-        let mut changes = 0;
+    for it in 0..iter {
+        let changes = AtomicU64::new(0);
 
         // assign each vertex to the cluster whose centroid is the closest
-        for (i, e) in elems.iter().enumerate() {
-            let old = membership[i];
-            let mut clus = old;
-            let mut dist = square_distance(e, &centroids[old]);
+        let dispatch_element = |i : usize| -> usize {
+            let e = &elems[i];
+            let old = membership[i].load(std::sync::atomic::Ordering::SeqCst);
+            let dist = square_distance(e, &centroids[old]);
 
-            for (c, centroid) in centroids.iter().enumerate() {
-                let sdist = square_distance(e, centroid);
-                if sdist < dist {
-                    dist = sdist;
-                    clus = c;
-                    changes += 1;
-                }
+            let (best_c, best_d) : (usize, f64) = (0..centroids.len()).into_iter()
+                    .map(|c| (c, square_distance(e, &centroids[c])))
+                    .min_by(|(_c1,d1), (_c2, d2)| if d1 < d2 
+                                {Ordering::Less} 
+                            else 
+                                {Ordering::Greater })
+                    .unwrap();
+            // we have nearest center
+            if best_c != old {
+                changes.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                membership[i].store(best_c, std::sync::atomic::Ordering::SeqCst);
             }
+            assert!(best_d <= dist); 
+            best_c           
+        };
 
-            membership[i] = clus;
-        }
+        let _res : Vec<usize> = (0..elems.len()).into_par_iter().map(|i| dispatch_element(i)).collect();
 
         // recompute the n-dimensions of each centroid
         // -> start resetting all centroid data
@@ -109,7 +139,7 @@ pub fn kmeans<'a, T: Elem>(k: usize, elems: &[T], iter: usize) -> Clustering<T> 
             c.0.iter_mut().for_each(|d| *d = 0.0));
         
         for (i, elem) in elems.iter().enumerate() {
-            let clus = membership[i];
+            let clus = membership[i].load(std::sync::atomic::Ordering::SeqCst);
             counts[clus] += 1;
             
             for (d, dim) in centroids[clus].0.iter_mut().enumerate() {
@@ -123,14 +153,15 @@ pub fn kmeans<'a, T: Elem>(k: usize, elems: &[T], iter: usize) -> Clustering<T> 
         }
                 
         // short circuit
-        if changes == 0 {
+        if changes.load(std::sync::atomic::Ordering::SeqCst) == 0 {
+            log::info!("short circuit after nb iter : {}", it);
             break;
         }
     }
 
     Clustering { 
         elements: elems, 
-        membership, 
+        membership : membership.iter().map(|x| x.load(std::sync::atomic::Ordering::SeqCst)).collect::<Vec<usize>>(), 
         centroids
     }
 }
