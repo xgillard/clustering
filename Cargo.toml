@@ -10,3 +10,9 @@ repository  = "https://github.com/xgillard/clustering"
 
 [dependencies]
 rand = "0.8"
+rayon = {version = "1.6"}
+
+
+log = { version = "0.4"}
+env_logger = { version = "0.10"}
+lazy_static = { version = "1.4"}
