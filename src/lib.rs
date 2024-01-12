@@ -51,25 +51,21 @@
 //! println!("centroids : {:?}", clustering.centroids);
 //! ```
 
+#[cfg(feature = "parallel")]
 use std::cmp::Ordering;
+#[cfg(feature = "parallel")]
 use std::sync::atomic::{AtomicUsize,AtomicU64};
+#[cfg(feature = "parallel")]
 use rayon::prelude::*;
+#[cfg(feature = "logging")]
 use lazy_static::lazy_static;
 
 //==========================================================================
 
-lazy_static! {
-    static ref LOG: u64 = {
-        let res = init_log();
-        res
-    };
-}
-
 // install a logger facility
-fn init_log() -> u64 {
-    let _res = env_logger::try_init();
-    println!("\n ************** initializing logger *****************\n");    
-    return 1;
+#[cfg(feature = "logging")]
+lazy_static! {
+    static ref _LOG: () = env_logger::init();
 }
 
 //=============================================================================
@@ -98,13 +94,17 @@ pub struct Clustering<'a, T> {
     pub centroids: Vec<Centroid>,
 }
 
+#[cfg(feature = "parallel")]
 /// This function returns a clustering that groups the given set of 
 /// 'elems' in 'k' clusters and will at most perform 'iter' iterations before stopping
-pub fn kmeans<'a, T: Elem + Sync>(k: usize, elems: &[T], iter: usize) -> Clustering<T> {
+pub fn kmeans<T: Elem + Sync>(k: usize, elems: &[T], iter: usize) -> Clustering<T> {
     let mut centroids = initialize(k, elems);
-    let membership : Vec<AtomicUsize> = (0..elems.len()).into_iter().map(|_| AtomicUsize::new(0usize)).collect();
+    let membership : Vec<AtomicUsize> = (0..elems.len())
+            .map(|_| AtomicUsize::new(0usize))
+            .collect();
     let mut counts = vec![0; k];
 
+    #[allow(unused_variables)] // -> it can be used if logging is enabled
     for it in 0..iter {
         let changes = AtomicU64::new(0);
 
@@ -114,7 +114,7 @@ pub fn kmeans<'a, T: Elem + Sync>(k: usize, elems: &[T], iter: usize) -> Cluster
             let old = membership[i].load(std::sync::atomic::Ordering::SeqCst);
             let dist = square_distance(e, &centroids[old]);
 
-            let (best_c, best_d) : (usize, f64) = (0..centroids.len()).into_iter()
+            let (best_c, best_d) : (usize, f64) = (0..centroids.len())
                     .map(|c| (c, square_distance(e, &centroids[c])))
                     .min_by(|(_c1,d1), (_c2, d2)| if d1 < d2 
                                 {Ordering::Less} 
@@ -130,7 +130,7 @@ pub fn kmeans<'a, T: Elem + Sync>(k: usize, elems: &[T], iter: usize) -> Cluster
             best_c           
         };
 
-        let _res : Vec<usize> = (0..elems.len()).into_par_iter().map(|i| dispatch_element(i)).collect();
+        let _res : Vec<usize> = (0..elems.len()).into_par_iter().map(dispatch_element).collect();
 
         // recompute the n-dimensions of each centroid
         // -> start resetting all centroid data
@@ -154,6 +154,7 @@ pub fn kmeans<'a, T: Elem + Sync>(k: usize, elems: &[T], iter: usize) -> Cluster
                 
         // short circuit
         if changes.load(std::sync::atomic::Ordering::SeqCst) == 0 {
+            #[cfg(feature = "logging")]
             log::info!("clustering kmeans: short circuit after nb iter : {}", it);
             break;
         }
@@ -162,6 +163,71 @@ pub fn kmeans<'a, T: Elem + Sync>(k: usize, elems: &[T], iter: usize) -> Cluster
     Clustering { 
         elements: elems, 
         membership : membership.iter().map(|x| x.load(std::sync::atomic::Ordering::SeqCst)).collect::<Vec<usize>>(), 
+        centroids
+    }
+}
+
+#[cfg(not(feature = "parallel"))]
+/// This function returns a clustering that groups the given set of 
+/// 'elems' in 'k' clusters and will at most perform 'iter' iterations before stopping
+pub fn kmeans<T: Elem>(k: usize, elems: &[T], iter: usize) -> Clustering<T> {
+    let mut centroids = initialize(k, elems);
+    let mut membership = vec![0; elems.len()];
+    let mut counts = vec![0; k];
+
+    #[allow(unused_variables)] // -> it can be used if logging is enabled
+    for it in 0..iter {
+        let mut changes = 0;
+
+        // assign each vertex to the cluster whose centroid is the closest
+        for (i, e) in elems.iter().enumerate() {
+            let old = membership[i];
+            let mut clus = old;
+            let mut dist = square_distance(e, &centroids[old]);
+
+            for (c, centroid) in centroids.iter().enumerate() {
+                let sdist = square_distance(e, centroid);
+                if sdist < dist {
+                    dist = sdist;
+                    clus = c;
+                    changes += 1;
+                }
+            }
+
+            membership[i] = clus;
+        }
+
+        // recompute the n-dimensions of each centroid
+        // -> start resetting all centroid data
+        counts.iter_mut().for_each(|x| *x = 0);
+        centroids.iter_mut().for_each(|c| 
+            c.0.iter_mut().for_each(|d| *d = 0.0));
+        
+        for (i, elem) in elems.iter().enumerate() {
+            let clus = membership[i];
+            counts[clus] += 1;
+            
+            for (d, dim) in centroids[clus].0.iter_mut().enumerate() {
+                *dim += elem.at(d);
+            }
+        }
+        
+        // -> normalize the computed distances
+        for (centroid, size) in centroids.iter_mut().zip(counts.iter().copied()) {
+            centroid.0.iter_mut().for_each(|d| if size == 0 { *d = 0.0 } else {*d /= size as f64});
+        }
+                
+        // short circuit
+        if changes == 0 {
+            #[cfg(feature = "logging")]
+            log::info!("clustering kmeans: short circuit after nb iter : {}", it);
+            break;
+        }
+    }
+
+    Clustering { 
+        elements: elems, 
+        membership, 
         centroids
     }
 }
@@ -188,7 +254,7 @@ fn square_distance(a: &dyn Elem, b: &dyn Elem) -> f64 {
 /// It returns a vector of centroids that are all equal to one of the vertices
 /// and all the centroids have greedily been chosen to be as far from one another
 /// as possibly can
-fn initialize<'a, T: Elem>(k: usize, elems: &'a [T]) -> Vec<Centroid> {
+fn initialize<T: Elem>(k: usize, elems: &[T]) -> Vec<Centroid> {
     let mut taken = vec![false; elems.len()];
     let mut centroids = vec![];
 
@@ -319,7 +385,7 @@ mod test {
             &[30.9],
         ];
 
-        let clus = kmeans(3, &items, 1000);
+        let clus = kmeans(3, items, 1000);
         println!("centroids  = {:?}", clus.membership);
         println!("membership = {:?}", clus.centroids);
     }

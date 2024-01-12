@@ -10,6 +10,25 @@ There are three goals to this implementation of the kmeans algorithm:
 2. it must be easy to use
 3. it must be reasonably fast
 
+## Important Note
+
+Depending on your execution environment and the size of the dataset you 
+aim to cluster; your code might benefit from parallelisation (this can 
+mean massive performance improvements for large problems). Should you 
+want to enable the multithreaded behavior, then add the "parallel" feature
+to your dependencies.
+
+```
+# To enable multithreading during clustering, add the "parallel" feature
+# to your dependency.
+[dependencies]
+clustering = {version = "0.2.0", features = ["parallel"]}
+
+# If all you aim for it a sequential clustering, just leave that feature out.
+[dependencies]
+clustering = {version = "0.2.0"}
+```
+
 ## Example
 
 ```rust
@@ -32,3 +51,9 @@ let clustering = kmeans(k, &samples, max_iter);
 println!("membership: {:?}", clustering.membership);
 println!("centroids : {:?}", clustering.centroids);
 ```
+
+## Features
+
+This crate comes with two optional features: 
+* `parallel` which enables multithreaded dispatch with rayon (thanks to @jean-pierreBoth 's contribution)
+* `logging`  which you can use to log when clustering takes shortcuts.
