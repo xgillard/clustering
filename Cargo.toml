@@ -8,11 +8,13 @@ repository  = "https://github.com/xgillard/clustering"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[features]
+parallel    = [ "dep:rayon" ]
+logging     = [ "dep:log", "dep:env_logger", "dep:lazy_static" ]
+
 [dependencies]
-rand = "0.8"
-rayon = {version = "1.6"}
-
-
-log = { version = "0.4"}
-env_logger = { version = "0.10"}
-lazy_static = { version = "1.4"}
+rand        = "0.8"
+rayon       = { version = "1.6",  optional = true }
+log         = { version = "0.4",  optional = true }
+env_logger  = { version = "0.10", optional = true }
+lazy_static = { version = "1.4",  optional = true }
