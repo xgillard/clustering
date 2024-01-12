@@ -154,7 +154,7 @@ pub fn kmeans<'a, T: Elem + Sync>(k: usize, elems: &[T], iter: usize) -> Cluster
                 
         // short circuit
         if changes.load(std::sync::atomic::Ordering::SeqCst) == 0 {
-            log::info!("short circuit after nb iter : {}", it);
+            log::info!("clustering kmeans: short circuit after nb iter : {}", it);
             break;
         }
     }
