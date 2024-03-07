@@ -82,7 +82,7 @@ pub trait Elem {
 /// A centroid: a collection of n abstract quantities (which must be interpreted
 /// in the context of what *you* are doing).
 #[derive(Debug)]
-pub struct Centroid(Vec<f64>);
+pub struct Centroid(pub Vec<f64>);
 /// This is the result of a kmeans clustering
 pub struct Clustering<'a, T> {
     /// The set of elements that have been clustered (in that order)

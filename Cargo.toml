@@ -1,6 +1,6 @@
 [package]
 name        = "clustering"
-version     = "0.2.0"
+version     = "0.2.1"
 edition     = "2021"
 description = "easy way to perform kmeans clustering on arbitrary data"
 license     = "MIT"
