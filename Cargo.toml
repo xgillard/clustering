@@ -1,7 +1,7 @@
 [package]
 name        = "clustering"
-version     = "0.2.1"
-edition     = "2021"
+version     = "0.2.2"
+edition     = "2024"
 description = "easy way to perform kmeans clustering on arbitrary data"
 license     = "MIT"
 repository  = "https://github.com/xgillard/clustering"
@@ -13,8 +13,8 @@ parallel    = [ "dep:rayon" ]
 logging     = [ "dep:log", "dep:env_logger", "dep:lazy_static" ]
 
 [dependencies]
-rand        = "0.8"
-rayon       = { version = "1.6",  optional = true }
+rand        = "0.9"
+rayon       = { version = "1.11",  optional = true }
 log         = { version = "0.4",  optional = true }
-env_logger  = { version = "0.10", optional = true }
+env_logger  = { version = "0.11", optional = true }
 lazy_static = { version = "1.4",  optional = true }

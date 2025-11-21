@@ -1,8 +1,8 @@
 # Clustering
 
-This crate provides an easy and efficient way to perform kmeans 
+This crate provides an easy and efficient way to perform kmeans
 clustering on arbitrary data. The algo is initialized with kmeans++
-for best performance of the clustering. 
+for best performance of the clustering.
 
 There are three goals to this implementation of the kmeans algorithm:
 
@@ -12,13 +12,13 @@ There are three goals to this implementation of the kmeans algorithm:
 
 ## Important Note
 
-Depending on your execution environment and the size of the dataset you 
-aim to cluster; your code might benefit from parallelisation (this can 
-mean massive performance improvements for large problems). Should you 
+Depending on your execution environment and the size of the dataset you
+aim to cluster; your code might benefit from parallelisation (this can
+mean massive performance improvements for large problems). Should you
 want to enable the multithreaded behavior, then add the "parallel" feature
 to your dependencies.
 
-```
+```rust
 # To enable multithreading during clustering, add the "parallel" feature
 # to your dependency.
 [dependencies]
@@ -54,6 +54,7 @@ println!("centroids : {:?}", clustering.centroids);
 
 ## Features
 
-This crate comes with two optional features: 
+This crate comes with two optional features:  
+
 * `parallel` which enables multithreaded dispatch with rayon (thanks to @jean-pierreBoth 's contribution)
 * `logging`  which you can use to log when clustering takes shortcuts.
